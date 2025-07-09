@@ -1,0 +1,63 @@
+// Bazel BUILD file grammar
+
+file = { SOI ~ statement* ~ EOI }
+
+statement = { rule | load_statement | comment | NEWLINE }
+
+// Load statements
+load_statement = { "load" ~ "(" ~ string ~ ("," ~ load_item)* ~ ")" }
+load_item = { string | identifier ~ "=" ~ string }
+
+// Rules
+rule = { identifier ~ "(" ~ arguments? ~ ")" }
+
+// Arguments
+arguments = { argument ~ ("," ~ argument)* ~ ","? }
+argument = { identifier ~ "=" ~ expression }
+
+// Expressions
+expression = {
+    string |
+    list |
+    dict |
+    number |
+    boolean |
+    identifier |
+    glob_expr |
+    select_expr
+}
+
+// String literals
+string = @{ "\"" ~ string_content ~ "\"" | "'" ~ string_content_single ~ "'" | "\"\"\"" ~ multiline_string ~ "\"\"\"" }
+string_content = @{ (!"\"" ~ ANY)* }
+string_content_single = @{ (!"'" ~ ANY)* }
+multiline_string = @{ (!("\"\"\"") ~ ANY)* }
+
+// Lists
+list = { "[" ~ (expression ~ ("," ~ expression)* ~ ","?)? ~ "]" }
+
+// Dictionaries
+dict = { "{" ~ (dict_entry ~ ("," ~ dict_entry)* ~ ","?)? ~ "}" }
+dict_entry = { expression ~ ":" ~ expression }
+
+// Numbers
+number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+
+// Booleans
+boolean = { "True" | "False" }
+
+// Identifiers
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Glob expressions
+glob_expr = { "glob" ~ "(" ~ list ~ ("," ~ identifier ~ "=" ~ expression)* ~ ")" }
+
+// Select expressions
+select_expr = { "select" ~ "(" ~ dict ~ ")" }
+
+// Comments
+comment = @{ "#" ~ (!NEWLINE ~ ANY)* }
+
+// Whitespace
+WHITESPACE = _{ " " | "\t" }
+NEWLINE = _{ "\n" | "\r\n" } 

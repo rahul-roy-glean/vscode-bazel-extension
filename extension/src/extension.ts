@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import {
     LanguageClient,
     LanguageClientOptions,
@@ -12,100 +13,119 @@ import { BazelTargetProvider } from './providers/targetProvider';
 let client: LanguageClient;
 
 export async function activate(context: vscode.ExtensionContext) {
+    // Show a message immediately to confirm activation
+    vscode.window.showInformationMessage('Bazel extension is activating...');
     console.log('Bazel extension is now active!');
 
-    // Path to the Rust LSP binary
-    const serverModule = context.asAbsolutePath(
-        path.join('server', process.platform === 'win32' ? 'bazel-lsp.exe' : 'bazel-lsp')
-    );
-
-    const serverOptions: ServerOptions = {
-        run: { 
-            command: serverModule,
-            transport: TransportKind.stdio
-        },
-        debug: {
-            command: serverModule,
-            args: ['--debug'],
-            transport: TransportKind.stdio,
-            options: { 
-                env: { 
-                    ...process.env,
-                    RUST_LOG: 'debug',
-                    RUST_BACKTRACE: '1'
-                } 
-            }
-        }
-    };
-
-    const clientOptions: LanguageClientOptions = {
-        documentSelector: [
-            { scheme: 'file', pattern: '**/BUILD{,.bazel}' },
-            { scheme: 'file', pattern: '**/*.{bazel,bzl}' },
-            { scheme: 'file', pattern: '**/WORKSPACE{,.bazel}' },
-            { scheme: 'file', language: 'go' },
-            { scheme: 'file', language: 'typescript' },
-            { scheme: 'file', language: 'javascript' },
-            { scheme: 'file', language: 'python' },
-            { scheme: 'file', language: 'java' }
-        ],
-        synchronize: {
-            fileEvents: [
-                vscode.workspace.createFileSystemWatcher('**/BUILD{,.bazel}'),
-                vscode.workspace.createFileSystemWatcher('**/*.{bazel,bzl}'),
-                vscode.workspace.createFileSystemWatcher('**/WORKSPACE{,.bazel}')
-            ]
-        },
-        outputChannelName: 'Bazel Language Server',
-        traceOutputChannelName: 'Bazel LSP Trace',
-        revealOutputChannelOn: 1 // RevealOutputChannelOn.Error
-    };
-
-    // Create the language client and start it
-    client = new LanguageClient(
-        'bazel-lsp',
-        'Bazel Language Server',
-        serverOptions,
-        clientOptions
-    );
-
-    // Register commands
-    registerCommands(context, client);
-
-    // Register tree data provider
-    const targetProvider = new BazelTargetProvider(client);
-    vscode.window.createTreeView('bazelTargets', {
-        treeDataProvider: targetProvider,
-        showCollapseAll: true
-    });
-
-    // Register CodeLens provider if enabled
-    const codeLensEnabled = vscode.workspace.getConfiguration('bazel').get<boolean>('enableCodeLens', true);
-    if (codeLensEnabled) {
-        context.subscriptions.push(
-            vscode.languages.registerCodeLensProvider(
-                { pattern: '**/*.{go,ts,js,py,java}' },
-                new BazelCodeLensProvider(client)
-            )
+    try {
+        // Path to the Rust LSP binary
+        const serverModule = context.asAbsolutePath(
+            path.join('server', process.platform === 'win32' ? 'bazel-lsp.exe' : 'bazel-lsp')
         );
-    }
 
-    // Start the client. This will also launch the server
-    await client.start();
+        // Check if the server binary exists
+        if (!fs.existsSync(serverModule)) {
+            throw new Error(`LSP server binary not found at: ${serverModule}`);
+        }
 
-    // Send configuration to server
-    await sendConfiguration();
+        console.log(`LSP server path: ${serverModule}`);
 
-    // Listen for configuration changes
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeConfiguration(async (e) => {
-            if (e.affectsConfiguration('bazel')) {
-                await sendConfiguration();
+        const serverOptions: ServerOptions = {
+            run: { 
+                command: serverModule,
+                transport: TransportKind.stdio
+            },
+            debug: {
+                command: serverModule,
+                args: ['--debug'],
+                transport: TransportKind.stdio,
+                options: { 
+                    env: { 
+                        ...process.env,
+                        RUST_LOG: 'debug',
+                        RUST_BACKTRACE: '1'
+                    } 
+                }
             }
-        })
-    );
+        };
 
-    console.log('Bazel language server started successfully');
+        const clientOptions: LanguageClientOptions = {
+            documentSelector: [
+                { scheme: 'file', pattern: '**/BUILD{,.bazel}' },
+                { scheme: 'file', pattern: '**/*.{bazel,bzl}' },
+                { scheme: 'file', pattern: '**/WORKSPACE{,.bazel}' },
+                { scheme: 'file', language: 'go' },
+                { scheme: 'file', language: 'typescript' },
+                { scheme: 'file', language: 'javascript' },
+                { scheme: 'file', language: 'python' },
+                { scheme: 'file', language: 'java' }
+            ],
+            synchronize: {
+                fileEvents: [
+                    vscode.workspace.createFileSystemWatcher('**/BUILD{,.bazel}'),
+                    vscode.workspace.createFileSystemWatcher('**/*.{bazel,bzl}'),
+                    vscode.workspace.createFileSystemWatcher('**/WORKSPACE{,.bazel}')
+                ]
+            },
+            outputChannelName: 'Bazel Language Server',
+            traceOutputChannel: vscode.window.createOutputChannel('Bazel LSP Trace'),
+            revealOutputChannelOn: 1 // RevealOutputChannelOn.Error
+        };
+
+        // Create the language client and start it
+        client = new LanguageClient(
+            'bazel-lsp',
+            'Bazel Language Server',
+            serverOptions,
+            clientOptions
+        );
+
+        // Register commands
+        registerCommands(context, client);
+
+        // Register tree data provider
+        const targetProvider = new BazelTargetProvider(client);
+        vscode.window.createTreeView('bazelTargets', {
+            treeDataProvider: targetProvider,
+            showCollapseAll: true
+        });
+
+        // Register CodeLens provider if enabled
+        const codeLensEnabled = vscode.workspace.getConfiguration('bazel').get<boolean>('enableCodeLens', true);
+        if (codeLensEnabled) {
+            context.subscriptions.push(
+                vscode.languages.registerCodeLensProvider(
+                    { pattern: '**/*.{go,ts,js,py,java}' },
+                    new BazelCodeLensProvider(client)
+                )
+            );
+        }
+
+        // Start the client. This will also launch the server
+        await client.start();
+
+        // Send configuration to server after a short delay
+        setTimeout(async () => {
+            await sendConfiguration();
+        }, 1000);
+
+        // Listen for configuration changes
+        context.subscriptions.push(
+            vscode.workspace.onDidChangeConfiguration(async (e) => {
+                if (e.affectsConfiguration('bazel')) {
+                    await sendConfiguration();
+                }
+            })
+        );
+
+        console.log('Bazel language server started successfully');
+        vscode.window.showInformationMessage('Bazel extension activated successfully!');
+
+    } catch (error) {
+        console.error('Failed to activate Bazel extension:', error);
+        vscode.window.showErrorMessage(`Failed to activate Bazel extension: ${error}`);
+        throw error;
+    }
 }
 
 export function deactivate(): Thenable<void> | undefined {

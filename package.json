@@ -7,16 +7,15 @@
     "extension"
   ],
   "scripts": {
-    "install": "npm install && cd bazel-lsp && cargo build --release",
     "build": "npm run build:rust && npm run build:extension",
-    "build:rust": "cd bazel-lsp && cargo build --release && mkdir -p ../extension/server && cp target/release/bazel-lsp ../extension/server/",
+    "build:rust": "cd lsp && cargo build --release && mkdir -p ../extension/server && cp target/release/bazel-lsp ../extension/server/",
     "build:extension": "cd extension && npm run compile",
     "watch": "cd extension && npm run watch",
     "test": "npm run test:rust && npm run test:extension",
-    "test:rust": "cd bazel-lsp && cargo test",
+    "test:rust": "cd lsp && cargo test",
     "test:extension": "cd extension && npm test",
     "package": "npm run build && cd extension && vsce package",
-    "clean": "rm -rf extension/out extension/server bazel-lsp/target",
+    "clean": "rm -rf extension/out extension/server lsp/target",
     "setup-hooks": "husky install"
   },
   "devDependencies": {

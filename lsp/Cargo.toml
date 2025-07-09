@@ -1,0 +1,51 @@
+[package]
+name = "bazel-lsp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tower-lsp = "0.20"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+dashmap = "5"  # Concurrent hashmap for caching
+pest = "2"     # Parser for BUILD files
+pest_derive = "2"
+rayon = "1"    # Parallel processing
+lru = "0.12"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+which = "6"    # Find bazel executable
+tempfile = "3"
+walkdir = "2"
+anyhow = "1"
+thiserror = "1"
+
+# For protobuf parsing (Bazel query output)
+prost = "0.12"
+prost-build = "0.12"
+
+# For integrating with external LSPs
+lsp-types = "0.95"
+lsp-server = "0.7"
+futures = "0.3"
+regex = "1"
+jsonrpc-core = "18.0"
+crossbeam-channel = "0.5"
+dirs = "5"
+
+[build-dependencies]
+prost-build = "0.12"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+
+# Platform-specific dependencies
+[target.'cfg(windows)'.dependencies]
+windows = "0.51"
+
+[target.'cfg(unix)'.dependencies]
+nix = "0.27" 

@@ -1,0 +1,265 @@
+{
+  "name": "bazel-extension",
+  "displayName": "Bazel",
+  "description": "High-performance Bazel support for VSCode with multi-language debugging",
+  "version": "0.1.0",
+  "publisher": "askscio",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "bazel",
+    "build",
+    "go",
+    "typescript",
+    "python",
+    "java",
+    "monorepo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rahul-roy-glean/vscode-bazel-extension"
+  },
+  "icon": "icon.png",
+  "activationEvents": [
+    "workspaceContains:**/BUILD",
+    "workspaceContains:**/BUILD.bazel",
+    "workspaceContains:**/WORKSPACE",
+    "workspaceContains:**/WORKSPACE.bazel"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "bazel",
+        "aliases": ["Bazel", "BUILD"],
+        "extensions": [".bazel", ".bzl"],
+        "filenames": ["BUILD", "BUILD.bazel", "WORKSPACE", "WORKSPACE.bazel"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bazel",
+        "scopeName": "source.bazel",
+        "path": "./syntaxes/bazel.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "bazel.build",
+        "title": "Bazel: Build Target"
+      },
+      {
+        "command": "bazel.test",
+        "title": "Bazel: Test Target"
+      },
+      {
+        "command": "bazel.run",
+        "title": "Bazel: Run Target"
+      },
+      {
+        "command": "bazel.clean",
+        "title": "Bazel: Clean"
+      },
+      {
+        "command": "bazel.showDependencies",
+        "title": "Bazel: Show Dependencies"
+      },
+      {
+        "command": "bazel.refresh",
+        "title": "Bazel: Refresh Workspace"
+      },
+      {
+        "command": "bazel.debug",
+        "title": "Bazel: Debug Target"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Bazel",
+      "properties": {
+        "bazel.executable": {
+          "type": "string",
+          "default": "bazel",
+          "description": "Path to the Bazel executable"
+        },
+        "bazel.workspaceRoot": {
+          "type": "string",
+          "default": "${workspaceFolder}",
+          "description": "Path to the Bazel workspace root"
+        },
+        "bazel.buildFlags": {
+          "type": "array",
+          "default": [],
+          "description": "Additional flags to pass to bazel build"
+        },
+        "bazel.testFlags": {
+          "type": "array",
+          "default": ["--test_output=errors"],
+          "description": "Additional flags to pass to bazel test"
+        },
+        "bazel.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CodeLens for build/test/run actions"
+        },
+        "bazel.cache.queryResults": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cache Bazel query results"
+        },
+        "bazel.cache.ttl": {
+          "type": "number",
+          "default": 300,
+          "description": "Cache TTL in seconds"
+        },
+        "bazel.parallelism": {
+          "type": "string",
+          "enum": ["auto", "1", "2", "4", "8", "16"],
+          "default": "auto",
+          "description": "Number of parallel workers for parsing"
+        },
+        "bazel.languages.go.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Go language support"
+        },
+        "bazel.languages.go.goplsPath": {
+          "type": "string",
+          "default": "gopls",
+          "description": "Path to gopls executable"
+        },
+        "bazel.languages.typescript.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable TypeScript language support"
+        },
+        "bazel.languages.typescript.tsserverPath": {
+          "type": "string",
+          "default": "auto",
+          "description": "Path to TypeScript server (auto to use bundled)"
+        },
+        "bazel.languages.python.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Python language support"
+        },
+        "bazel.languages.python.interpreter": {
+          "type": "string",
+          "default": "auto",
+          "description": "Path to Python interpreter"
+        },
+        "bazel.languages.java.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Java language support"
+        },
+        "bazel.languages.java.jdtlsPath": {
+          "type": "string",
+          "default": "auto",
+          "description": "Path to Eclipse JDT Language Server"
+        }
+      }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "bazelTargets",
+          "name": "Bazel Targets",
+          "icon": "$(symbol-folder)",
+          "contextualTitle": "Bazel Targets"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "bazel.refresh",
+          "when": "view == bazelTargets",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "bazel.build",
+          "when": "resourceExtname == .go || resourceExtname == .ts || resourceExtname == .py || resourceExtname == .java",
+          "group": "1_bazel"
+        },
+        {
+          "command": "bazel.test",
+          "when": "resourceFilename =~ /.*_test\\.(go|ts|py|java)$/",
+          "group": "1_bazel"
+        }
+      ]
+    },
+    "debuggers": [
+      {
+        "type": "bazel-go",
+        "label": "Bazel Go",
+        "languages": ["go"],
+        "configurationAttributes": {
+          "launch": {
+            "required": ["target"],
+            "properties": {
+              "target": {
+                "type": "string",
+                "description": "Bazel target to debug"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments to pass to the program"
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "bazel-python",
+        "label": "Bazel Python",
+        "languages": ["python"],
+        "configurationAttributes": {
+          "launch": {
+            "required": ["target"],
+            "properties": {
+              "target": {
+                "type": "string",
+                "description": "Bazel target to debug"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments to pass to the program"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

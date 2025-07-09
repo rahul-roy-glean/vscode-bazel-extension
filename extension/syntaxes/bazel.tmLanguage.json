@@ -1,0 +1,115 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Bazel",
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#keywords" },
+        { "include": "#rules" },
+        { "include": "#labels" },
+        { "include": "#functions" }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.number-sign.bazel",
+                    "match": "#.*$"
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "name": "string.quoted.triple.bazel",
+                    "begin": "\"\"\"",
+                    "end": "\"\"\""
+                },
+                {
+                    "name": "string.quoted.double.bazel",
+                    "begin": "\"",
+                    "end": "\"",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.bazel",
+                            "match": "\\\\."
+                        }
+                    ]
+                },
+                {
+                    "name": "string.quoted.single.bazel",
+                    "begin": "'",
+                    "end": "'",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.bazel",
+                            "match": "\\\\."
+                        }
+                    ]
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.bazel",
+                    "match": "\\b[0-9]+\\b"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.bazel",
+                    "match": "\\b(if|else|elif|for|return|pass|break|continue|and|or|not|in|is)\\b"
+                },
+                {
+                    "name": "constant.language.bazel",
+                    "match": "\\b(True|False|None)\\b"
+                },
+                {
+                    "name": "storage.type.function.bazel",
+                    "match": "\\b(def|lambda)\\b"
+                }
+            ]
+        },
+        "rules": {
+            "patterns": [
+                {
+                    "name": "entity.name.function.bazel",
+                    "match": "\\b(go_binary|go_library|go_test|cc_binary|cc_library|cc_test|py_binary|py_library|py_test|java_binary|java_library|java_test|ts_library|ts_project|proto_library|filegroup|genrule|config_setting|alias|exports_files|glob|select|package|load|workspace|repository_rule)\\b"
+                }
+            ]
+        },
+        "labels": {
+            "patterns": [
+                {
+                    "name": "string.other.label.bazel",
+                    "match": "//[^:\"'\\s]+:[^:\"'\\s]+"
+                },
+                {
+                    "name": "string.other.label.bazel",
+                    "match": ":[^:\"'\\s]+"
+                },
+                {
+                    "name": "string.other.label.bazel",
+                    "match": "@[^/\"'\\s]+//[^:\"'\\s]+"
+                }
+            ]
+        },
+        "functions": {
+            "patterns": [
+                {
+                    "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.function.bazel"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "scopeName": "source.bazel"
+} 

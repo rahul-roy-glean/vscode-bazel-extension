@@ -99,8 +99,21 @@ export function registerCommands(context: vscode.ExtensionContext, client: Langu
     // Refresh workspace command
     context.subscriptions.push(
         vscode.commands.registerCommand('bazel.refresh', async () => {
-            await client.sendNotification('bazel/refreshWorkspace');
+            await client.sendNotification('bazel/refreshWorkspace', {});
             vscode.window.showInformationMessage('Bazel workspace refreshed');
+        })
+    );
+
+    // Open target command (for tree view clicks)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('bazel.openTarget', async (targetLabel: string) => {
+            // Query the target location from the server
+            const location = await client.sendRequest<{ uri: string; range?: vscode.Range }>('bazel/getTargetLocation', { target: targetLabel });
+            if (location && location.uri) {
+                const uri = vscode.Uri.parse(location.uri);
+                const document = await vscode.workspace.openTextDocument(uri);
+                await vscode.window.showTextDocument(document);
+            }
         })
     );
 
@@ -126,15 +139,8 @@ export function registerCommands(context: vscode.ExtensionContext, client: Langu
                 case 'python':
                     debugType = 'bazel-python';
                     break;
-                case 'java':
-                    debugType = 'bazel-java';
-                    break;
-                case 'typescript':
-                case 'javascript':
-                    debugType = 'bazel-node';
-                    break;
                 default:
-                    vscode.window.showErrorMessage(`Debugging not supported for ${language}`);
+                    vscode.window.showErrorMessage(`Debugging not supported for ${language}. Only Go and Python are currently supported.`);
                     return;
             }
 

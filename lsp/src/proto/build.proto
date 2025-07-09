@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package blaze.query;
+
+// Minimal subset of Bazel query proto output we need
+message QueryResult {
+  repeated Target target = 1;
+}
+
+message Target {
+  enum Discriminator {
+    UNKNOWN = 0;
+    RULE = 1;
+    SOURCE_FILE = 2;
+    GENERATED_FILE = 3;
+    PACKAGE_GROUP = 4;
+    ENVIRONMENT_GROUP = 5;
+  }
+  
+  Discriminator type = 1;
+  Rule rule = 2;
+  SourceFile source_file = 3;
+  GeneratedFile generated_file = 4;
+}
+
+message Rule {
+  string name = 1;
+  string rule_class = 2;
+  repeated string rule_input = 3;
+  repeated string rule_output = 4;
+  repeated Attribute attribute = 5;
+}
+
+message Attribute {
+  string name = 1;
+  oneof value {
+    string string_value = 2;
+    int64 int_value = 3;
+    bool bool_value = 4;
+    StringList string_list_value = 5;
+  }
+}
+
+message StringList {
+  repeated string string_value = 1;
+}
+
+message SourceFile {
+  string name = 1;
+}
+
+message GeneratedFile {
+  string name = 1;
+  string generating_rule = 2;
+} 

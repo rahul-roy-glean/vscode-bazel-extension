@@ -18,6 +18,7 @@ bazel-*
 *.swp
 *.swo
 *~
+.ijwb
 
 # OS
 .DS_Store

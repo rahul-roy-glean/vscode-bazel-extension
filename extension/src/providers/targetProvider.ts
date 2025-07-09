@@ -16,15 +16,25 @@ export class BazelTargetProvider implements vscode.TreeDataProvider<BazelTargetI
     private targets: Map<string, BazelTarget[]> = new Map();
 
     constructor(private client: LanguageClient) {
-        this.refresh();
+        // Don't refresh immediately - wait for client to be ready
         
         // Listen for workspace changes
         client.onNotification('bazel/targetsChanged', () => {
             this.refresh();
         });
+        
+        // Delay initial refresh to allow client to start and scan workspace
+        setTimeout(() => {
+            this.refresh();
+        }, 5000); // Increased from 2000ms to 5000ms
     }
 
     refresh(): void {
+        // Only refresh if client is ready
+        if (!this.client || this.client.state !== 2) { // 2 = Running
+            return;
+        }
+        
         this.loadTargets().then(() => {
             this._onDidChangeTreeData.fire();
         });
@@ -59,7 +69,12 @@ export class BazelTargetProvider implements vscode.TreeDataProvider<BazelTargetI
 
     private async loadTargets(): Promise<void> {
         try {
-            const result = await this.client.sendRequest<BazelTarget[]>('bazel/getAllTargets');
+            // Check if client is ready
+            if (!this.client || this.client.state !== 2) { // 2 = Running
+                return;
+            }
+            
+            const result = await this.client.sendRequest<BazelTarget[]>('bazel/getAllTargets', {});
             
             // Group targets by package
             this.targets.clear();

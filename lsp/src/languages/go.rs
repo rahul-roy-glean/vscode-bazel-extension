@@ -33,7 +33,7 @@ impl GoProxy {
 
             // Configure gopls for Bazel
             let init_options = json!({
-                "build.directoryFilters": ["-bazel-*"],
+                "build.directoryFilters": ["-.bazel/*"],
                 "build.experimentalWorkspaceModule": true,
                 "formatting.gofumpt": true,
                 "ui.semanticTokens": true,
@@ -56,7 +56,7 @@ impl GoProxy {
 
     async fn open_workspace(&self, conn: &LspConnection) -> Result<()> {
         // Generate go.mod if needed for gopls
-        let go_mod_path = self.workspace_root.join("go.mod");
+        let go_mod_path = self.workspace_root.join("go/go.mod");
         if !go_mod_path.exists() {
             // Create a temporary go.mod for gopls
             let module_name = self.guess_module_name().await;
@@ -113,7 +113,7 @@ impl GoProxy {
             }
             
             // Check Bazel's external directory
-            let external_path = self.workspace_root.join("bazel-bin/external");
+            let external_path = self.workspace_root.join(".bazel/bin/external");
             if external_path.exists() {
                 let parts: Vec<&str> = import_path.split('/').collect();
                 if parts.len() >= 3 {

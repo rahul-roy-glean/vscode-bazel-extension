@@ -69,7 +69,20 @@ export async function activate(context: vscode.ExtensionContext) {
             },
             outputChannelName: 'Bazel Language Server',
             traceOutputChannel: vscode.window.createOutputChannel('Bazel LSP Trace'),
-            revealOutputChannelOn: 1 // RevealOutputChannelOn.Error
+            revealOutputChannelOn: 1, // RevealOutputChannelOn.Error
+            initializationOptions: {
+                // Tell the server not to register these commands as they're already registered client-side
+                excludeCommands: [
+                    'bazel.build',
+                    'bazel.test', 
+                    'bazel.run',
+                    'bazel.clean',
+                    'bazel.showDependencies',
+                    'bazel.refresh',
+                    'bazel.debug',
+                    'bazel.openTarget'
+                ]
+            }
         };
 
         // Create the language client and start it
@@ -80,7 +93,7 @@ export async function activate(context: vscode.ExtensionContext) {
             clientOptions
         );
 
-        // Register commands
+        // Register commands before starting the client
         registerCommands(context, client);
 
         // Register tree data provider
@@ -90,7 +103,10 @@ export async function activate(context: vscode.ExtensionContext) {
             showCollapseAll: true
         });
 
-        // Register CodeLens provider if enabled
+        // Start the client. This will also launch the server
+        await client.start();
+
+        // Register CodeLens provider after client has started
         const codeLensEnabled = vscode.workspace.getConfiguration('bazel').get<boolean>('enableCodeLens', true);
         if (codeLensEnabled) {
             context.subscriptions.push(
@@ -101,13 +117,8 @@ export async function activate(context: vscode.ExtensionContext) {
             );
         }
 
-        // Start the client. This will also launch the server
-        await client.start();
-
-        // Send configuration to server after a short delay
-        setTimeout(async () => {
-            await sendConfiguration();
-        }, 1000);
+        // Send configuration to server after it's ready
+        await sendConfiguration();
 
         // Listen for configuration changes
         context.subscriptions.push(
@@ -181,14 +192,40 @@ class BazelCodeLensProvider implements vscode.CodeLensProvider {
         document: vscode.TextDocument,
         token: vscode.CancellationToken
     ): Promise<vscode.CodeLens[]> {
-        const result = await this.client.sendRequest(
-            'textDocument/codeLens',
-            {
-                textDocument: { uri: document.uri.toString() }
-            },
-            token
-        );
-        
-        return result as vscode.CodeLens[];
+        // Check if client is ready
+        if (!this.client || this.client.state !== 2) { // 2 = Running
+            return [];
+        }
+
+        try {
+            // Check for cancellation before making the request
+            if (token.isCancellationRequested) {
+                return [];
+            }
+
+            const result = await this.client.sendRequest(
+                'textDocument/codeLens',
+                {
+                    textDocument: { uri: document.uri.toString() }
+                },
+                token
+            );
+            
+            // Check for cancellation after receiving the result
+            if (token.isCancellationRequested) {
+                return [];
+            }
+            
+            return result as vscode.CodeLens[];
+        } catch (error: any) {
+            // Handle cancellation silently
+            if (error?.code === -32800 || error?.message === 'Canceled') {
+                return [];
+            }
+            
+            // Only log non-cancellation errors
+            console.error('Error providing code lenses:', error);
+            return [];
+        }
     }
 }

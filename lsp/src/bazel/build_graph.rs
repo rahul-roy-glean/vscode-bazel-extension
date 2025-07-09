@@ -64,6 +64,8 @@ pub struct BuildGraph {
     targets: DashMap<String, BazelTarget>,
     file_to_targets: DashMap<PathBuf, Vec<String>>,
     workspace_root: Option<PathBuf>,
+    // Track reverse dependencies: target -> list of targets that depend on it
+    reverse_deps: DashMap<String, Vec<String>>,
 }
 
 impl BuildGraph {
@@ -72,6 +74,7 @@ impl BuildGraph {
             targets: DashMap::new(),
             file_to_targets: DashMap::new(),
             workspace_root: None,
+            reverse_deps: DashMap::new(),
         }
     }
 
@@ -82,11 +85,25 @@ impl BuildGraph {
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| {
+                let path = e.path();
+                // Skip Bazel output directories (both default bazel-* and custom .bazel/)
+                if path.components().any(|c| {
+                    if let Some(name) = c.as_os_str().to_str() {
+                        name.starts_with("bazel-") || name == ".bazel"
+                    } else {
+                        false
+                    }
+                }) {
+                    return false;
+                }
+                
                 let name = e.file_name().to_string_lossy();
-                (name == "BUILD" || name == "BUILD.bazel") && !e.path().starts_with("bazel-")
+                name == "BUILD" || name == "BUILD.bazel"
             })
             .map(|e| e.path().to_owned())
             .collect();
+
+        tracing::info!("Found {} BUILD files to parse", build_files.len());
 
         // Parse BUILD files in parallel using Rayon
         let results: Vec<_> = build_files
@@ -100,6 +117,8 @@ impl BuildGraph {
                 tracing::warn!("Failed to parse BUILD file: {}", e);
             }
         }
+
+        tracing::info!("Finished scanning workspace, found {} targets", self.targets.len());
 
         Ok(())
     }
@@ -131,6 +150,14 @@ impl BuildGraph {
                                 let src_path = path.parent().unwrap().join(src);
                                 self.file_to_targets
                                     .entry(src_path)
+                                    .or_insert_with(Vec::new)
+                                    .push(label.clone());
+                            }
+
+                            // Update reverse dependencies
+                            for dep in &target.deps {
+                                self.reverse_deps
+                                    .entry(dep.clone())
                                     .or_insert_with(Vec::new)
                                     .push(label.clone());
                             }
@@ -293,11 +320,97 @@ impl BuildGraph {
         self.targets.iter().map(|entry| entry.value().clone()).collect()
     }
 
+    pub fn get_targets_in_file(&self, uri: &Url) -> Vec<BazelTarget> {
+        self.targets
+            .iter()
+            .filter(|entry| entry.value().location.uri == *uri)
+            .map(|entry| entry.value().clone())
+            .collect()
+    }
+
     pub async fn refresh(&mut self) -> Result<()> {
         if let Some(workspace_root) = self.workspace_root.clone() {
             self.scan_workspace(&workspace_root).await
         } else {
             Err(anyhow::anyhow!("Workspace root not set"))
         }
+    }
+
+    pub fn find_references(&self, target_label: &str) -> Vec<Location> {
+        let mut references = Vec::new();
+        
+        // Find all targets that depend on this target
+        if let Some(dependents) = self.reverse_deps.get(target_label) {
+            for dependent_label in dependents.value() {
+                if let Some(dependent) = self.targets.get(dependent_label) {
+                    references.push(dependent.location.clone());
+                }
+            }
+        }
+        
+        // Also find references in srcs attributes
+        for target in self.targets.iter() {
+            // Check if this target is referenced in srcs
+            if target.srcs.iter().any(|src| src == target_label) {
+                references.push(target.location.clone());
+            }
+        }
+        
+        references
+    }
+
+    pub fn get_reverse_dependencies(&self, target_label: &str) -> Vec<String> {
+        self.reverse_deps
+            .get(target_label)
+            .map(|deps| deps.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn get_target_at_position(&self, uri: &Url, position: Position) -> Option<String> {
+        // Get all targets in this file
+        let targets = self.get_targets_in_file(uri);
+        
+        // For now, we'll do a simple implementation:
+        // Try to read the line at the position and extract a target label
+        if let Ok(path) = uri.to_file_path() {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                let lines: Vec<&str> = content.lines().collect();
+                if let Some(line) = lines.get(position.line as usize) {
+                    // Look for Bazel target patterns like //foo:bar or :bar
+                    let target_pattern = regex::Regex::new(r#"["']?(//[^"'\s]+|:[^"'\s]+)["']?"#).ok()?;
+                    
+                    // Find all matches in the line
+                    for capture in target_pattern.captures_iter(line) {
+                        if let Some(match_) = capture.get(1) {
+                            let start_col = match_.start() as u32;
+                            let end_col = match_.end() as u32;
+                            
+                            // Check if position is within this match
+                            if position.character >= start_col && position.character <= end_col {
+                                let label = match_.as_str();
+                                
+                                // Handle relative labels (:foo)
+                                if label.starts_with(':') {
+                                    // Find the package from any target in this file
+                                    if let Some(target) = targets.first() {
+                                        let package = &target.package;
+                                        if package.is_empty() {
+                                            return Some(format!("//{}", label));
+                                        } else {
+                                            return Some(format!("//{}{}", package, label));
+                                        }
+                                    }
+                                } else {
+                                    return Some(label.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: return the first target in the file
+        targets.first().map(|t| t.label.clone())
     }
 } 

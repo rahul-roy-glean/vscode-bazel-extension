@@ -54,8 +54,8 @@ impl JavaProxy {
                         },
                         "project": {
                             "referencedLibraries": [
-                                "bazel-bin/**/*.jar",
-                                "bazel-out/**/*.jar"
+                                ".bazel/bin/**/*.jar",
+                                ".bazel/out/**/*.jar"
                             ]
                         }
                     }
@@ -162,7 +162,7 @@ impl JavaProxy {
 
         // Try common locations
         let candidates = vec![
-            "/usr/lib/jvm/java-11-openjdk",
+            "/Library/Java/JavaVirtualMachines/openjdk-17.jdk/Contents/Home",
             "/usr/lib/jvm/java-11-openjdk-amd64",
             "/Library/Java/JavaVirtualMachines/adoptopenjdk-11.jdk/Contents/Home",
             "/System/Library/Frameworks/JavaVM.framework/Versions/Current",
@@ -183,9 +183,8 @@ impl JavaProxy {
         
         // Check in workspace
         let src_paths = vec![
-            self.workspace_root.join("src/main/java").join(&path),
-            self.workspace_root.join("src/test/java").join(&path),
-            self.workspace_root.join("java").join(&path),
+            self.workspace_root.join("java/com/askscio").join(&path),
+            self.workspace_root.join("javatests/com/askscio").join(&path),
             self.workspace_root.join(&path),
         ];
 
@@ -196,7 +195,7 @@ impl JavaProxy {
         }
 
         // Check in bazel-bin for generated files
-        let bazel_bin = self.workspace_root.join("bazel-bin");
+        let bazel_bin = self.workspace_root.join(".bazel/bin");
         if bazel_bin.exists() {
             let generated = bazel_bin.join(&path);
             if generated.exists() {

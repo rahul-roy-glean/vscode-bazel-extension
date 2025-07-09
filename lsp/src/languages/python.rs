@@ -100,10 +100,10 @@ impl PythonProxy {
                 ],
                 "extraPaths": [
                     ".",
-                    "bazel-bin",
-                    "bazel-out"
+                    ".bazel/bin",
+                    ".bazel/out"
                 ],
-                "pythonVersion": "3.9",
+                "pythonVersion": "3.10.14",
                 "typeCheckingMode": "basic"
             });
 
@@ -118,8 +118,8 @@ impl PythonProxy {
                     "analysis": {
                         "extraPaths": [
                             self.workspace_root.to_str().unwrap(),
-                            self.workspace_root.join("bazel-bin").to_str().unwrap(),
-                            self.workspace_root.join("bazel-out").to_str().unwrap()
+                            self.workspace_root.join(".bazel/bin").to_str().unwrap(),
+                            self.workspace_root.join(".bazel/out").to_str().unwrap()
                         ]
                     }
                 }
@@ -152,7 +152,7 @@ impl PythonProxy {
         }
 
         // Check bazel-bin for generated files
-        let bazel_bin = self.workspace_root.join("bazel-bin");
+        let bazel_bin = self.workspace_root.join(".bazel/bin");
         if bazel_bin.exists() {
             let mut path = bazel_bin;
             for part in &parts {

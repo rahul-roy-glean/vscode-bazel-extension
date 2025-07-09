@@ -15,29 +15,14 @@ bash scripts/build.sh
 
 # Build for multiple platforms
 echo "Building Rust LSP server for multiple platforms..."
-cd bazel-lsp
+cd lsp
 
 # Build for current platform
 cargo build --release
 
 # Create platform-specific directories
-mkdir -p ../extension/server/linux-x64
-mkdir -p ../extension/server/darwin-x64
 mkdir -p ../extension/server/darwin-arm64
-mkdir -p ../extension/server/win32-x64
-
-# Copy binaries based on current platform
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    cp target/release/bazel-lsp ../extension/server/linux-x64/
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    if [[ $(uname -m) == "arm64" ]]; then
-        cp target/release/bazel-lsp ../extension/server/darwin-arm64/
-    else
-        cp target/release/bazel-lsp ../extension/server/darwin-x64/
-    fi
-elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    cp target/release/bazel-lsp.exe ../extension/server/win32-x64/
-fi
+cp target/release/bazel-lsp ../extension/server/darwin-arm64/
 
 # Package the extension
 echo "Creating VSIX package..."

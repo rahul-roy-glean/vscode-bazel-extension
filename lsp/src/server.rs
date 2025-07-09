@@ -1,5 +1,6 @@
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
+
 use tower_lsp::{Client, LanguageServer};
 use std::sync::Arc;
 use dashmap::DashMap;
@@ -132,15 +133,7 @@ impl LanguageServer for BazelLanguageServer {
                     resolve_provider: Some(false),
                 }),
                 document_symbol_provider: Some(OneOf::Left(true)),
-                workspace_symbol_provider: Some(OneOf::Left(true)),
-                execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec![
-                        "bazel.build".to_string(),
-                        "bazel.test".to_string(),
-                        "bazel.run".to_string(),
-                    ],
-                    ..Default::default()
-                }),
+                // workspace_symbol_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
@@ -387,6 +380,97 @@ impl LanguageServer for BazelLanguageServer {
         }
     }
 
+    async fn references(
+        &self,
+        params: ReferenceParams,
+    ) -> Result<Option<Vec<Location>>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        
+        tracing::info!("References request for {:?} at {:?}", uri, position);
+        
+        // Check if this is a BUILD file
+        let path = uri.path();
+        if path.ends_with("BUILD") || path.ends_with("BUILD.bazel") {
+            // Handle Bazel target references
+            let build_graph = self.build_graph.read().await;
+            
+            // Find the target at the current position
+            if let Some(target_label) = build_graph.get_target_at_position(&uri, position) {
+                let references = build_graph.find_references(&target_label);
+                
+                tracing::info!("Found {} references to target {}", references.len(), target_label);
+                
+                return Ok(Some(references));
+            }
+        } else {
+            // For source files, delegate to the appropriate language server
+            let file_path = match uri.to_file_path() {
+                Ok(path) => path,
+                Err(_) => return Ok(Some(Vec::new()))
+            };
+            
+            // Determine file type and delegate
+            if let Some(extension) = file_path.extension().and_then(|e| e.to_str()) {
+                match extension {
+                    "go" => {
+                        // In a full implementation, we would delegate to the Go language server
+                        tracing::info!("Would delegate Go references request to Go language server");
+                    }
+                    "py" => {
+                        // In a full implementation, we would delegate to the Python language server
+                        tracing::info!("Would delegate Python references request to Python language server");
+                    }
+                    "java" => {
+                        // In a full implementation, we would delegate to the Java language server
+                        tracing::info!("Would delegate Java references request to Java language server");
+                    }
+                    "ts" | "js" => {
+                        // In a full implementation, we would delegate to the TypeScript language server
+                        tracing::info!("Would delegate TypeScript references request to TypeScript language server");
+                    }
+                    _ => {}
+                }
+            }
+        }
+        
+        Ok(Some(Vec::new()))
+    }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        let uri = params.text_document.uri;
+        
+        // For BUILD files, return symbols for targets
+        if uri.path().ends_with("BUILD") || uri.path().ends_with("BUILD.bazel") {
+            let build_graph = self.build_graph.read().await;
+            let mut symbols = Vec::new();
+            
+            for target in build_graph.get_targets_in_file(&uri) {
+                let symbol = DocumentSymbol {
+                    name: target.label.clone(),
+                    detail: Some(target.kind.clone()),
+                    kind: SymbolKind::FUNCTION,
+                    range: Range::new(Position::new(0, 0), Position::new(0, 0)),
+                    selection_range: Range::new(Position::new(0, 0), Position::new(0, 0)),
+                    children: None,
+                    tags: None,
+                    deprecated: None,
+                };
+                symbols.push(symbol);
+            }
+            
+            return Ok(Some(DocumentSymbolResponse::Nested(symbols)));
+        }
+        
+        // For other files, we could delegate to language servers but for now return empty
+        Ok(None)
+    }
+
+    // Commands are now handled client-side, so this is no longer needed
+    /*
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
         match params.command.as_str() {
             "bazel.build" => {
@@ -410,6 +494,7 @@ impl LanguageServer for BazelLanguageServer {
             _ => Ok(None),
         }
     }
+    */
 }
 
 impl BazelLanguageServer {
@@ -488,5 +573,117 @@ impl BazelLanguageServer {
             }
             _ => Ok(()), // Ignore unknown notifications
         }
+    }
+
+    // Custom method handlers for tower-lsp
+    pub async fn bazel_get_target_for_file(&self, params: Value) -> Result<Value> {
+        let uri = params.get("uri")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| tower_lsp::jsonrpc::Error::invalid_params("Missing uri"))?;
+        
+        let url = Url::parse(uri).map_err(|e| tower_lsp::jsonrpc::Error::invalid_params(format!("Invalid URI: {}", e)))?;
+        let build_graph = self.build_graph.read().await;
+        
+        if let Some(target) = build_graph.get_target_for_file(&url) {
+            Ok(serde_json::json!({ "target": target.label }))
+        } else {
+            Ok(serde_json::json!({ "target": null }))
+        }
+    }
+
+    pub async fn bazel_get_dependencies(&self, params: Value) -> Result<Value> {
+        let target = params.get("target")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| tower_lsp::jsonrpc::Error::invalid_params("Missing target"))?;
+        
+        let build_graph = self.build_graph.read().await;
+        if let Some(target_info) = build_graph.get_target(target) {
+            Ok(serde_json::json!(target_info.deps))
+        } else {
+            Ok(serde_json::json!([]))
+        }
+    }
+
+    pub async fn bazel_get_all_targets(&self, _params: Value) -> Result<Value> {
+        let build_graph = self.build_graph.read().await;
+        let targets = build_graph.get_all_targets();
+        serde_json::to_value(targets)
+            .map_err(|_| tower_lsp::jsonrpc::Error::internal_error())
+    }
+
+    pub async fn bazel_get_target_location(&self, params: Value) -> Result<Value> {
+        let target = params.get("target")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| tower_lsp::jsonrpc::Error::invalid_params("Missing target"))?;
+        
+        let build_graph = self.build_graph.read().await;
+        if let Some(target_info) = build_graph.get_target(target) {
+            Ok(serde_json::json!({
+                "uri": target_info.location.uri.to_string(),
+                "range": target_info.location.range
+            }))
+        } else {
+            Ok(serde_json::json!(null))
+        }
+    }
+
+    pub async fn bazel_refresh_workspace(&self, _params: Value) -> Result<Value> {
+        let mut build_graph = self.build_graph.write().await;
+        build_graph.refresh().await
+            .map_err(|e| tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::InternalError,
+                message: format!("Failed to refresh workspace: {}", e).into(),
+                data: None,
+            })?;
+        
+        Ok(serde_json::json!({
+            "success": true
+        }))
+    }
+
+    pub async fn bazel_get_target_dependencies(&self, params: Value) -> Result<Value> {
+        let target_label = params.get("targetLabel")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::InvalidParams,
+                message: "Missing targetLabel parameter".into(),
+                data: None,
+            })?;
+        
+        let build_graph = self.build_graph.read().await;
+        
+        // Get the target
+        let target = build_graph.get_target(&target_label);
+        
+        // Get reverse dependencies
+        let reverse_deps = build_graph.get_reverse_dependencies(&target_label);
+        
+        Ok(serde_json::json!({
+            "targetLabel": target_label,
+            "dependencies": target.as_ref().map(|t| &t.deps).unwrap_or(&Vec::new()),
+            "reverseDependencies": reverse_deps,
+            "exists": target.is_some()
+        }))
+    }
+
+    pub async fn custom_references(&self, params: Value) -> Result<Value> {
+        // Parse the ReferenceParams from the incoming JSON
+        let reference_params: ReferenceParams = serde_json::from_value(params)
+            .map_err(|e| tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::InvalidParams,
+                message: format!("Invalid reference parameters: {}", e).into(),
+                data: None,
+            })?;
+        
+        // Call the existing references implementation
+        let result = self.references(reference_params).await?;
+        
+        // Convert the result back to JSON
+        Ok(serde_json::to_value(result)
+            .map_err(|e| tower_lsp::jsonrpc::Error {
+                code: tower_lsp::jsonrpc::ErrorCode::InternalError,
+                message: format!("Failed to serialize result: {}", e).into(),
+                data: None,
+            })?)
     }
 } 

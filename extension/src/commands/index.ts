@@ -99,7 +99,7 @@ export function registerCommands(context: vscode.ExtensionContext, client: Langu
     // Refresh workspace command
     context.subscriptions.push(
         vscode.commands.registerCommand('bazel.refresh', async () => {
-            await client.sendNotification('bazel/refreshWorkspace');
+            await client.sendNotification('bazel/refreshWorkspace', {});
             vscode.window.showInformationMessage('Bazel workspace refreshed');
         })
     );

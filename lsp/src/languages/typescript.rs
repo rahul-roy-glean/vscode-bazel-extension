@@ -131,7 +131,7 @@ impl TypeScriptProxy {
         }
 
         // Check bazel-bin for generated files
-        let bazel_bin = self.workspace_root.join("bazel-bin");
+        let bazel_bin = self.workspace_root.join(".bazel/bin");
         if bazel_bin.exists() {
             let candidate = bazel_bin.join(import_path);
             if candidate.exists() {

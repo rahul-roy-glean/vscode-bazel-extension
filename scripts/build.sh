@@ -11,7 +11,7 @@ cd "$PROJECT_ROOT"
 
 # Build Rust LSP server
 echo "Building Rust LSP server..."
-cd bazel-lsp
+cd lsp
 cargo build --release
 
 # Create server directory in extension

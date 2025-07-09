@@ -1,0 +1,53 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/extension"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/extension/out/**/*.js"
+            ],
+            "preLaunchTask": "npm: compile - extension"
+        },
+        {
+            "name": "Extension + Server",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/extension"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/extension/out/**/*.js"
+            ],
+            "preLaunchTask": "Build All",
+            "env": {
+                "RUST_LOG": "debug"
+            }
+        },
+        {
+            "name": "Server Only",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=bazel-lsp",
+                    "--package=bazel-lsp"
+                ],
+                "filter": {
+                    "name": "bazel-lsp",
+                    "kind": "bin"
+                }
+            },
+            "args": ["--debug"],
+            "cwd": "${workspaceFolder}/bazel-lsp",
+            "env": {
+                "RUST_LOG": "debug"
+            }
+        }
+    ]
+}

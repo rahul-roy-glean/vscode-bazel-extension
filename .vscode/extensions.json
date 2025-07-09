@@ -1,0 +1,10 @@
+{
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "editorconfig.editorconfig",
+        "ms-vscode.vscode-typescript-tslint-plugin",
+        "vadimcn.vscode-lldb"
+    ]
+}
